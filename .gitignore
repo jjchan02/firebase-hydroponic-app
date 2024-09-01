@@ -1,6 +1,7 @@
 **/node_modules/
 app/android/app/google-services.json
 **/__pycache__
+**/venv
 model-server/resources
 **/env
 model-server/*.png
