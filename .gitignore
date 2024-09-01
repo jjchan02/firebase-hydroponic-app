@@ -1,0 +1,7 @@
+**/node_modules/
+app/android/app/google-services.json
+**/__pycache__
+model-server/resources
+**/env
+model-server/*.png
+app-server/creds.json

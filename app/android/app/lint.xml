@@ -1,0 +1,5 @@
+<lint>
+    <issue id="Deprecated">
+        <severity>warning</severity>
+    </issue>
+</lint>
