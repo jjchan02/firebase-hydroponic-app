@@ -49,8 +49,8 @@ Ensure the following are installed on your system:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/jjchan02/hydroponic-monitoring-app.git
-cd hydroponic-monitoring-app
+git clone https://github.com/jjchan02/firebase-hydroponic-app.git
+cd firebase-hydroponic-app
 ```
 
 ### 2. Mobile App Setup (React Native)
