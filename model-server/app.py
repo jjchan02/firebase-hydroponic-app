@@ -131,8 +131,11 @@ def receive_data():
             detected = bool(padded_anomalies[last_anomaly_index])
             
             # Ensure last_anomaly_index is within the bounds of exceeding_losses
-            if last_anomaly_index < len(exceeding_losses):
-                detected_loss = exceeding_losses[last_anomaly_index]
+            if len(exceeding_losses) > 0:
+                if last_anomaly_index < len(exceeding_losses):
+                    detected_loss = exceeding_losses[last_anomaly_index]
+                else:
+                    detected_loss = exceeding_losses[-1]  # Handle case where only one loss exists
             else:
                 detected_loss = None
         else:
