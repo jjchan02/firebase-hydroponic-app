@@ -121,7 +121,7 @@ const UserProfile = () => {
         // Alert the user about email change and verification email
         Alert.alert(
           'Success',
-          'Email updated successfully. A verification email has been sent. Please sign in again.',
+          'Email updated successfully. Please sign in again.',
         );
 
         // Log out the user
