@@ -23,7 +23,7 @@ const parameterKeys = [
   "highPhTrigger",
 ];
 
-const sendDataForPredict = async (latestData) => {
+const sendDataForPredict = async (latestData, parameterSettings) => {
   try {
     if (!latestData) {
       throw new Error("latestData is undefined or null");
@@ -32,7 +32,7 @@ const sendDataForPredict = async (latestData) => {
     console.log("Sending data to Python");
     const response = await axios.post(
       "http://127.0.0.1:5000/predict-triggers",
-      { latestData },
+      { latestData, parameterSettings },
       {
         headers: {
           "Content-Type": "application/json",
@@ -145,10 +145,11 @@ const updateLatestData = async (userId, sectorId) => {
     );
 
     const parameterData = await sectorModel.retrieveLatestData(sectorId);
+    const parameterSettings = await sectorModel.getParameterSettings(sectorId);
 
     // Call sendDataToPython to send data and parameterSettings
     const response = await sendDataToPython(parameterData);
-    const triggerStatus = await sendDataForPredict(parameterData);
+    const triggerStatus = await sendDataForPredict(parameterData, parameterSettings);
 
     // Store anomalies if detected is true
     if (response.summary.detected === true) {
