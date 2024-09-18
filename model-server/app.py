@@ -26,9 +26,10 @@ def predict_trigger(data, seq_length):
 
     all_values = np.array(all_values)
 
-    # Scale the features
-    X_scaled, scaler = scale_features(all_values)
+    # Scale the features (ensure that scaling method is consistent)
+    X_scaled, scaler = scale_features(all_values)  # Ensure this uses the same scaling logic as detect_anomalies
     sequences = create_sequences(X_scaled, seq_length)
+    print(f"Total sequences generated:", sequences.shape)
 
     # Load the model
     input_dim = sequences.shape[2]
@@ -37,17 +38,32 @@ def predict_trigger(data, seq_length):
     model.load_weights("model_v4.h5")
 
     # Perform predictions
-    predictions = model.predict(sequences)
-    predictions_original_scale = scaler.inverse_transform(predictions)
+    predictions = []
+    actual_values = []
 
-    # Map predictions to trigger names
+    for seq in sequences:
+        seq_input = seq[:-1].reshape((1, timesteps, input_dim))
+        seq_true = seq[-1]
+
+        seq_pred = model.predict(seq_input)
+        predictions.append(seq_pred.flatten())
+        actual_values.append(seq_true)
+
+    predictions = np.array(predictions)
+    actual_values = np.array(actual_values)
+
+    # Inverse transform predictions back to original scale
+    predictions_original_scale = scaler.inverse_transform(predictions)
+    actual_values_original_scale = scaler.inverse_transform(actual_values)
+
+    # Map predictions to parameter names, using the last index of the predictions
     parameter_names = ['surroundingTemperature', 'surroundingHumidity', 'solutionTemperature', 'pH', 'tds', 'lightIntensity', 'foggerTemperature', 'foggerHumidity', 'lowTdsTrigger', 'highTdsTrigger', 'lowPhTrigger', 'highPhTrigger', 'foggerTrigger']
     predictions_dict = {}
     
     for i, name in enumerate(parameter_names):
         if i < predictions_original_scale.shape[1]:  # Check index bounds
-            # Use the mean of the predictions if multiple values are predicted
-            predictions_dict[name] = np.mean(predictions_original_scale[:, i]).tolist()
+            # Use the last value of the predictions
+            predictions_dict[name] = predictions_original_scale[-1, i].tolist()
 
     # Debug: Print out the predictions dictionary
     print(f"Predictions Dictionary: {predictions_dict}")
@@ -55,20 +71,67 @@ def predict_trigger(data, seq_length):
     return predictions_dict
 
 
-def check_trigger(predictions, thresholds):
+# def check_trigger(predictions, thresholds):
+#     trigger_status = {}
+    
+#     for trigger_name, threshold in thresholds.items():
+#         if trigger_name in predictions:
+#             predicted_value = predictions[trigger_name]
+#             if predicted_value >= threshold:
+#                 trigger_status[trigger_name] = True
+#             else:
+#                 trigger_status[trigger_name] = False
+#         else:
+#             # Debug: Print a message if the trigger_name is missing in predictions
+#             print(f"Trigger name {trigger_name} not found in predictions")
+    
+#     # Debug: Print out the resulting trigger statuses
+#     print(f"Trigger Status: {trigger_status}")
+
+#     return trigger_status
+
+def check_trigger(predictions, parameter_settings):
     trigger_status = {}
-    
-    for trigger_name, threshold in thresholds.items():
-        if trigger_name in predictions:
-            predicted_value = predictions[trigger_name]
-            if predicted_value >= threshold:
-                trigger_status[trigger_name] = True
-            else:
-                trigger_status[trigger_name] = False
+
+    # Extract boundaries from parameter settings
+    tds_lower, tds_upper = parameter_settings['tds']
+    ph_lower, ph_upper = parameter_settings['pH']
+    humidity_lower, humidity_upper = parameter_settings['surroundingHumidity']
+
+    # TDS trigger
+    if 'tds' in predictions:
+        tds_value = predictions['tds']
+        if tds_value < tds_lower:
+            trigger_status['lowTdsTrigger'] = True
         else:
-            # Debug: Print a message if the trigger_name is missing in predictions
-            print(f"Trigger name {trigger_name} not found in predictions")
-    
+            trigger_status['lowTdsTrigger'] = False
+
+        if tds_value > tds_upper:
+            trigger_status['highTdsTrigger'] = True
+        else:
+            trigger_status['highTdsTrigger'] = False
+
+    # pH trigger
+    if 'pH' in predictions:
+        ph_value = predictions['pH']
+        if ph_value < ph_lower:
+            trigger_status['lowPhTrigger'] = True
+        else:
+            trigger_status['lowPhTrigger'] = False
+
+        if ph_value > ph_upper:
+            trigger_status['highPhTrigger'] = True
+        else:
+            trigger_status['highPhTrigger'] = False
+
+    # Humidity (surroundingHumidity) trigger for fogger
+    if 'surroundingHumidity' in predictions:
+        humidity_value = predictions['surroundingHumidity']
+        if humidity_value < humidity_lower:
+            trigger_status['foggerTrigger'] = True
+        else:
+            trigger_status['foggerTrigger'] = False
+
     # Debug: Print out the resulting trigger statuses
     print(f"Trigger Status: {trigger_status}")
 
@@ -149,7 +212,7 @@ def receive_data():
                 'detected_list': np.sum(padded_anomalies).tolist(),
                 "threshold": float(threshold),
                 'loss': detected_loss,
-                'indices': np.where(padded_anomalies)[0].tolist(),
+                'indices': anomaly_indices.tolist(),
                 'exceeding_losses': exceeding_losses
             },
             "predictions": predictions_dict,
@@ -176,22 +239,24 @@ def predict_triggers():
 
         # Extract parameters from latestData
         parameters = data.get('latestData', {})
+        parameterSettings = data.get('parameterSettings', {})
         seq_length = 10  # or set as needed
 
         # Predict triggers
         predictions = predict_trigger(parameters, seq_length)
 
-        # Define your thresholds for triggers
-        thresholds = {
-            'lowTdsTrigger': 0.5,
-            'highTdsTrigger': 0.5,
-            'lowPhTrigger': 0.5,
-            'highPhTrigger': 0.5,
-            'foggerTrigger': 0.5
-        }
+        # # Define your thresholds for triggers
+        # thresholds = {
+        #     'lowTdsTrigger': 0.5,
+        #     'highTdsTrigger': 0.5,
+        #     'lowPhTrigger': 0.5,
+        #     'highPhTrigger': 0.5,
+        #     'foggerTrigger': 0.5
+        # }
 
         # Check triggers based on predictions
-        trigger_status = check_trigger(predictions, thresholds)
+        # trigger_status = check_trigger(predictions, thresholds)
+        trigger_status = check_trigger(predictions, parameterSettings)
 
         # Prepare response
         response = {
